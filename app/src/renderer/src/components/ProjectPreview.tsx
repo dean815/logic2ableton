@@ -49,13 +49,13 @@ export default function ProjectPreview({
   const [tempoDraft, setTempoDraft] = useState(String(tempo))
   const source = sourceForDirection(direction)
   const destination = destinationForDirection(direction)
-  const projectName = preview?.projectName || basename(sourcePath).replace(/\.(logicx|als|ptx|pts)$/i, "")
+  const projectName = preview?.projectName || basename(sourcePath).replace(/\.(logicx|als|ptx|pts|ptf)$/i, "")
 
   useEffect(() => setTempoDraft(String(tempo)), [tempo])
 
   const commitTempo = () => {
     const parsed = Number(tempoDraft)
-    if (!Number.isFinite(parsed)) {
+    if (!tempoDraft.trim() || !Number.isFinite(parsed)) {
       setTempoDraft(String(tempo))
       return
     }

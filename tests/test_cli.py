@@ -1,7 +1,6 @@
 import subprocess
 import sys
 import json
-from pathlib import Path
 
 import pytest
 
@@ -9,7 +8,7 @@ from logic2ableton.cli import main
 from logic2ableton import __version__
 from logic2ableton.models import LogicProject
 
-TEST_PROJECT = Path("Might Last Forever.logicx")
+from conftest import TEST_PROJECT, TEST_PROJECT_NAME
 
 
 @pytest.mark.needs_test_project
@@ -20,7 +19,7 @@ def test_cli_report_only():
         text=True,
     )
     assert result.returncode == 0
-    assert "Might Last Forever" in result.stdout
+    assert TEST_PROJECT_NAME in result.stdout
     assert "TRACKS TRANSFERRED" in result.stdout
 
 
@@ -41,7 +40,7 @@ def test_cli_full_conversion(tmp_path):
         text=True,
     )
     assert result.returncode == 0
-    als_path = tmp_path / "output" / "Might Last Forever Project" / "Might Last Forever.als"
+    als_path = tmp_path / "output" / f"{TEST_PROJECT_NAME} Project" / f"{TEST_PROJECT_NAME}.als"
     assert als_path.exists()
 
 
@@ -271,6 +270,34 @@ def test_cli_forward_rejects_als_input(tmp_path, capsys):
     assert "Stage: validation" in report_path.read_text(encoding="utf-8")
 
 
+def test_cli_forward_explains_logic9_project(tmp_path, capsys):
+    project_path = tmp_path / "Old Song.logic"
+    (project_path / "Audio Files").mkdir(parents=True)
+    output_dir = tmp_path / "output"
+
+    exit_code = main([str(project_path), "--output", str(output_dir)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "'Old Song.logic' is a Logic Pro 8 or 9 project" in captured.err
+    assert "Save As" in captured.err
+    report_path = output_dir / "Old Song_conversion_report.txt"
+    assert "Stage: validation" in report_path.read_text(encoding="utf-8")
+
+
+def test_cli_forward_rejects_file_inside_logicx(tmp_path, capsys):
+    project_data = tmp_path / "Song.logicx" / "Alternatives" / "000" / "ProjectData"
+    project_data.parent.mkdir(parents=True)
+    project_data.write_bytes(b"\x00")
+    output_dir = tmp_path / "output"
+
+    exit_code = main([str(project_data), "--output", str(output_dir)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "Pass the .logicx package itself" in captured.err
+
+
 def test_cli_forward_rejects_unstructured_logicx(tmp_path, capsys):
     project_path = tmp_path / "empty.logicx"
     project_path.mkdir()
@@ -317,7 +344,7 @@ def test_cli_template_flag(tmp_path):
         text=True,
     )
     assert result.returncode == 0
-    als_path = tmp_path / "output" / "Might Last Forever Project" / "Might Last Forever.als"
+    als_path = tmp_path / "output" / f"{TEST_PROJECT_NAME} Project" / f"{TEST_PROJECT_NAME}.als"
     assert als_path.exists()
 
 
@@ -366,7 +393,7 @@ def test_cli_json_progress(tmp_path):
         text=True,
     )
     assert result.returncode == 0
-    lines = [l for l in result.stdout.strip().split("\n") if l.strip()]
+    lines = [line for line in result.stdout.strip().split("\n") if line.strip()]
     parsed = [json.loads(line) for line in lines]
     stages = [p["stage"] for p in parsed]
     assert "parsing" in stages
@@ -392,7 +419,7 @@ def test_cli_json_progress_report_only():
         text=True,
     )
     assert result.returncode == 0
-    lines = [l for l in result.stdout.strip().split("\n") if l.strip()]
+    lines = [line for line in result.stdout.strip().split("\n") if line.strip()]
     parsed = [json.loads(line) for line in lines]
     stages = [p["stage"] for p in parsed]
     assert "complete" in stages

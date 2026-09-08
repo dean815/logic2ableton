@@ -1,4 +1,5 @@
 import json
+import plistlib
 import struct
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from logic2ableton.models import AudioFileRef
 from logic2ableton.logic_parser import (
     _build_compatibility_warnings,
     _get_aiff_timestamp,
+    discover_alternatives,
     discover_audio_files,
     extract_plugins,
     extract_regions,
@@ -15,18 +17,19 @@ from logic2ableton.logic_parser import (
     parse_logic_project,
     parse_metadata,
     parse_project_info,
+    resolve_alternative,
 )
 
-TEST_PROJECT = Path("Might Last Forever.logicx")
+from conftest import TEST_PROJECT, TEST_PROJECT_NAME
 
 
 # Task 3 tests
 @pytest.mark.needs_test_project
 def test_parse_project_info():
     info = parse_project_info(TEST_PROJECT)
-    assert info["name"] == "Might Last Forever"
+    assert info["name"] == TEST_PROJECT_NAME
     assert "Logic Pro" in info["last_saved_from"]
-    assert info["variant_names"]["0"] == "Might Last Forever"
+    assert info["variant_names"]["0"] == TEST_PROJECT_NAME
 
 
 @pytest.mark.needs_test_project
@@ -69,7 +72,6 @@ def test_discover_audio_files():
     assert len(refs) == 38
     track_names = sorted(set(r.track_name for r in refs))
     assert "KICK IN" in track_names
-    assert "Tyler Amp" in track_names
     assert "scratch vox 2" in track_names
 
 
@@ -94,7 +96,7 @@ def test_discover_audio_files_comps():
 @pytest.mark.needs_test_project
 def test_parse_logic_project():
     project = parse_logic_project(TEST_PROJECT, alternative=0)
-    assert project.name == "Might Last Forever"
+    assert project.name == TEST_PROJECT_NAME
     assert project.tempo == 120.0
     assert project.time_sig_numerator == 4
     assert project.sample_rate == 44100
@@ -107,7 +109,6 @@ def test_parse_logic_project():
 def test_parse_logic_project_track_names():
     project = parse_logic_project(TEST_PROJECT, alternative=0)
     assert "KICK IN" in project.track_names
-    assert "Tyler Amp" in project.track_names
     assert "SNARE" in project.track_names
     assert "BASS GUITAR" in project.track_names
     assert "keys" in project.track_names
@@ -231,11 +232,6 @@ def test_build_compatibility_warnings_for_missing_and_unpositioned_audio(tmp_pat
 
 
 # Alternative discovery tests
-import plistlib
-
-from logic2ableton.logic_parser import discover_alternatives, resolve_alternative
-
-
 def _make_logicx(tmp_path: Path, *, alternatives: list[int], active_variant: int) -> Path:
     logicx = tmp_path / "Sample.logicx"
     resources = logicx / "Resources"

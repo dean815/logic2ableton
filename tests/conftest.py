@@ -1,24 +1,22 @@
 import gzip
 import os
-import wave
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
 
-TEST_PROJECT = Path("Might Last Forever.logicx")
-HAS_TEST_PROJECT = TEST_PROJECT.exists() and (TEST_PROJECT / "Resources" / "ProjectInformation.plist").exists()
+from scripts.fixture_builders import write_test_wav
+
+_LOGIC_FIXTURE_PATH = os.environ.get("L2A_LOGIC_FIXTURE")
+TEST_PROJECT = Path(_LOGIC_FIXTURE_PATH) if _LOGIC_FIXTURE_PATH else None
+TEST_PROJECT_NAME = TEST_PROJECT.stem if TEST_PROJECT is not None else ""
+HAS_TEST_PROJECT = TEST_PROJECT is not None and (TEST_PROJECT / "Resources" / "ProjectInformation.plist").is_file()
 
 HAS_VST3 = Path(os.environ.get("VST3_PATH", "C:/Program Files/Common Files/VST3")).exists()
 
-PTX_FIXTURE = Path(
-    os.environ.get(
-        "L2A_PTX_FIXTURE",
-        "D:/New Mixes/Miley Cyrus - Flowers - Scratch tracks (No Band)/"
-        "MC - Flowers - Scratch tracks (No Band).ptx",
-    )
-)
-HAS_PTX_FIXTURE = PTX_FIXTURE.is_file()
+_PTX_FIXTURE_PATH = os.environ.get("L2A_PTX_FIXTURE")
+PTX_FIXTURE = Path(_PTX_FIXTURE_PATH) if _PTX_FIXTURE_PATH else None
+HAS_PTX_FIXTURE = PTX_FIXTURE is not None and PTX_FIXTURE.is_file()
 
 
 def pytest_collection_modifyitems(config, items):
@@ -35,16 +33,6 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_no_ptx)
 
 
-def write_test_wav(path: Path, *, frames: int = 44100, sample_rate: int = 44100) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with wave.open(str(path), "wb") as handle:
-        handle.setnchannels(1)
-        handle.setsampwidth(2)
-        handle.setframerate(sample_rate)
-        handle.writeframes(b"\x00\x00" * frames)
-    return path
-
-
 def create_test_als(
     tmp_path: Path,
     *,
@@ -59,12 +47,9 @@ def create_test_als(
 
     root = ET.Element("Ableton")
     live_set = ET.SubElement(root, "LiveSet")
-    transport = ET.SubElement(live_set, "Transport")
-    tempo = ET.SubElement(ET.SubElement(transport, "Tempo"), "Manual")
-    tempo.set("Value", "128")
-    ts = ET.SubElement(ET.SubElement(transport, "TimeSignatures"), "RemoteableTimeSignature")
-    ET.SubElement(ts, "Numerator").set("Value", "4")
-    ET.SubElement(ts, "Denominator").set("Value", "4")
+    mixer = ET.SubElement(ET.SubElement(ET.SubElement(live_set, "MainTrack"), "DeviceChain"), "Mixer")
+    ET.SubElement(ET.SubElement(mixer, "Tempo"), "Manual").set("Value", "128")
+    ET.SubElement(ET.SubElement(mixer, "TimeSignature"), "Manual").set("Value", "201")
 
     locators = ET.SubElement(ET.SubElement(live_set, "Locators"), "Locators")
     locator = ET.SubElement(locators, "Locator")
