@@ -24,3 +24,5 @@ app/resources/logic2ableton*
 # Local working notes.
 notes/
 todos/
+# Dean's personal guidelines stay local in public repos
+.claude/dean-guidelines.md
